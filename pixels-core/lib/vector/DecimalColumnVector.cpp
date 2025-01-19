@@ -125,7 +125,7 @@ void DecimalColumnVector::add(std::string &value) {
     } else if (value == "false") {
         add(0);
     } else {
-        add(getval(value,precision));
+        add(getval(value,scale));
     }
 }
 

@@ -19,7 +19,7 @@ DateColumnVector::DateColumnVector(uint64_t len, bool encoding): ColumnVector(le
 void DateColumnVector::close() {
 	if(!closed) {//encoding &&
 		if( dates != nullptr) {
-			//free(dates);
+			free(dates);
 		}
 		dates = nullptr;
 		ColumnVector::close();
