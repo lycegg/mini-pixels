@@ -3,21 +3,23 @@
 //
 
 #include "vector/DateColumnVector.h"
+#include <algorithm>
+#include "duckdb/common/types/date.hpp"
 
 DateColumnVector::DateColumnVector(uint64_t len, bool encoding): ColumnVector(len, encoding) {
-	if(encoding) {
-        posix_memalign(reinterpret_cast<void **>(&dates), 32,
-                       len * sizeof(int32_t));
-	} else {
-		this->dates = nullptr;
-	}
+	//if(encoding) {
+    //printf("date_fenpei_ret=%d",);
+    posix_memalign(reinterpret_cast<void **>(&dates), 32,len * sizeof(int32_t));
+	//} else {
+	//	this->dates = nullptr;
+	//}
 	memoryUsage += (long) sizeof(int) * len;
 }
 
 void DateColumnVector::close() {
-	if(!closed) {
-		if(encoding && dates != nullptr) {
-			free(dates);
+	if(!closed) {//encoding &&
+		if( dates != nullptr) {
+			//free(dates);
 		}
 		dates = nullptr;
 		ColumnVector::close();
@@ -56,5 +58,46 @@ void * DateColumnVector::current() {
         return nullptr;
     } else {
         return dates + readIndex;
+    }
+}
+
+void DateColumnVector::add(std::string &value) {
+    add(duckdb::Date::FromString(value).days);
+}
+
+void DateColumnVector::add(bool value) {
+    add(value ? 1 : 0);
+}
+
+void DateColumnVector::add(int64_t value) {
+    if (writeIndex >= length) {
+        ensureSize(writeIndex * 2, true);
+    }
+    int index = writeIndex++;
+    dates[index]=value;
+    isNull[index] = false;
+}
+
+void DateColumnVector::add(int value) {
+    if (writeIndex >= length) {
+        ensureSize(writeIndex * 2, true);
+    }
+    int index = writeIndex++;
+    dates[index]=value;
+    isNull[index] = false;
+}
+
+void DateColumnVector::ensureSize(uint64_t size, bool preserveData) {
+    ColumnVector::ensureSize(size, preserveData);
+    if (length < size) {
+		int *oldVector = dates;
+    	//printf("date_fenpei_ret=%d",);
+		posix_memalign(reinterpret_cast<void **>(&dates), 32,size * sizeof(int32_t));
+		if (preserveData) {
+			std::copy(oldVector, oldVector + length, dates);
+		}
+		delete[] oldVector;
+		memoryUsage += (long) sizeof(int) * (size - length);
+		resize(size);
     }
 }

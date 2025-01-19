@@ -3,6 +3,8 @@
 //
 
 #include "vector/TimestampColumnVector.h"
+#include <algorithm>
+#include "duckdb/common/types/timestamp.hpp"
 
 TimestampColumnVector::TimestampColumnVector(int precision, bool encoding): ColumnVector(VectorizedRowBatch::DEFAULT_SIZE, encoding) {
     TimestampColumnVector(VectorizedRowBatch::DEFAULT_SIZE, precision, encoding);
@@ -10,20 +12,22 @@ TimestampColumnVector::TimestampColumnVector(int precision, bool encoding): Colu
 
 TimestampColumnVector::TimestampColumnVector(uint64_t len, int precision, bool encoding): ColumnVector(len, encoding) {
     this->precision = precision;
-    if(encoding) {
+    //if(encoding) {
         posix_memalign(reinterpret_cast<void **>(&this->times), 64,
                        len * sizeof(long));
-    } else {
-        this->times = nullptr;
-    }
+    //printf("timestamp:alloc%d\n",len);
+    //printf("defaultsize=%d\n",VectorizedRowBatch::DEFAULT_SIZE);
+    //} else {
+    //    this->times = nullptr;
+    //}
 }
 
 
 void TimestampColumnVector::close() {
     if(!closed) {
-        ColumnVector::close();
-        if(encoding && this->times != nullptr) {
-            free(this->times);
+        ColumnVector::close();//encoding &&
+        if( this->times != nullptr) {
+            //free(this->times);
         }
         this->times = nullptr;
     }
@@ -64,4 +68,46 @@ void TimestampColumnVector::set(int elementNum, long ts) {
     }
     times[elementNum] = ts;
     // TODO: isNull
+}
+
+
+void TimestampColumnVector::add(std::string &value) {
+    add(duckdb::Timestamp::FromString(value).value);
+}
+
+void TimestampColumnVector::add(bool value) {
+    add(value ? 1 : 0);
+}
+
+void TimestampColumnVector::add(int64_t value) {
+    if (writeIndex >= length) {
+        ensureSize(writeIndex * 2, true);
+    }
+    int index = writeIndex++;
+    times[index]=value;
+    isNull[index] = false;
+}
+
+void TimestampColumnVector::add(int value) {
+    if (writeIndex >= length) {
+        ensureSize(writeIndex * 2, true);
+    }
+    int index = writeIndex++;
+    times[index]=value;
+    isNull[index] = false;
+}
+
+void TimestampColumnVector::ensureSize(uint64_t size, bool preserveData) {
+    ColumnVector::ensureSize(size, preserveData);
+    if (length < size) {
+        long *oldVector = times;
+        posix_memalign(reinterpret_cast<void **>(&times), 32,
+                        size * sizeof(int64_t));
+        if (preserveData) {
+            std::copy(oldVector, oldVector + length, times);
+        }
+        delete[] oldVector;
+        memoryUsage += (long) sizeof(long) * (size - length);
+        resize(size);
+    }
 }
